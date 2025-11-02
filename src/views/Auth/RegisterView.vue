@@ -24,19 +24,25 @@
             />
 
             <v-text-field
+              ref="passwordField"
               v-model="password"
+              :type="showPassword ? 'text' : 'password'"
               label="Password"
-              type="password"
               prepend-inner-icon="mdi-lock"
+              :append-inner-icon="showPassword ? 'mdi-eye' : 'mdi-eye-off'"
+              @click:append-inner="togglePasswordVisibility('password')"
               :error-messages="passwordError"
               required
             />
 
             <v-text-field
+              ref="confirmField"
               v-model="password_confirmation"
+              :type="showConfirm ? 'text' : 'password'"
               label="Confirm Password"
-              type="password"
               prepend-inner-icon="mdi-lock-check"
+              :append-inner-icon="showConfirm ? 'mdi-eye' : 'mdi-eye-off'"
+              @click:append-inner="togglePasswordVisibility('confirm')"
               :error-messages="confirmError"
               required
             />
@@ -66,6 +72,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { store } from '@/store'
 import { register } from '@/store/authApi'
+import { eventBus } from '@/utils/eventBus'
 
 const name = ref('')
 const email = ref('')
@@ -79,26 +86,63 @@ const emailError = ref('')
 const passwordError = ref('')
 const confirmError = ref('')
 
+const passwordField = ref<any>(null)
+const confirmField = ref<any>(null)
+const showPassword = ref(false)
+const showConfirm = ref(false)
+
 const router = useRouter()
 
+const togglePasswordVisibility = (field: 'password' | 'confirm') => {
+  let cursorPosition = 0
+  let inputElement: HTMLInputElement | null = null
+
+  if (field === 'password') {
+    const input = passwordField.value?.$el.querySelector('input')
+    cursorPosition = input?.selectionStart || 0
+    showPassword.value = !showPassword.value
+    inputElement = passwordField.value?.$el.querySelector('input')
+  } else {
+    const input = confirmField.value?.$el.querySelector('input')
+    cursorPosition = input?.selectionStart || 0
+    showConfirm.value = !showConfirm.value
+    inputElement = confirmField.value?.$el.querySelector('input')
+  }
+
+  setTimeout(() => {
+    if (inputElement) {
+      inputElement.focus()
+      inputElement.setSelectionRange(cursorPosition, cursorPosition)
+    }
+  }, 0)
+}
+
 const handleRegister = async () => {
-  nameError.value = name.value ? '' : 'Name is required'
-  emailError.value = email.value ? '' : 'Email is required'
-  passwordError.value = password.value ? '' : 'Password is required'
-  confirmError.value = password_confirmation.value ? '' : 'Confirm password'
+  nameError.value = ''
+  emailError.value = ''
+  passwordError.value = ''
+  confirmError.value = ''
+  error.value = ''
+
+  if (!name.value) nameError.value = 'Name is required'
+  if (!email.value) emailError.value = 'Email is required'
+  if (!password.value) passwordError.value = 'Password is required'
+  if (!password_confirmation.value) confirmError.value = 'Confirm password is required'
+
   if (password.value !== password_confirmation.value) {
     confirmError.value = 'Passwords do not match'
   }
+
   if (
     !name.value ||
     !email.value ||
     !password.value ||
+    !password_confirmation.value ||
     password.value !== password_confirmation.value
   )
     return
 
   isLoading.value = true
-  error.value = ''
 
   try {
     const result = await store
@@ -112,10 +156,16 @@ const handleRegister = async () => {
       )
       .unwrap()
 
-    // Auto-login after register
     localStorage.setItem('token', result.token)
+    localStorage.setItem('user', JSON.stringify(result.user))
+
     console.log('Registered & logged in:', result.user)
-    router.push('/')
+
+    eventBus.emit('auth-changed')
+
+    setTimeout(() => {
+      router.push('/')
+    }, 100)
   } catch (err: any) {
     error.value = err?.data?.message || 'Registration failed'
   } finally {

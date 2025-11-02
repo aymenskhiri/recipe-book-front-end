@@ -6,7 +6,6 @@
           <v-card-title class="text-h5 text-center mb-4">Reset Password</v-card-title>
 
           <v-form @submit.prevent="handleReset">
-       
             <v-text-field
               v-model="email"
               label="Email"
@@ -17,7 +16,6 @@
               required
             />
 
-        
             <input type="hidden" v-model="token" />
 
             <v-text-field
@@ -48,10 +46,11 @@
               Reset Password
             </v-btn>
 
-            <v-alert v-if="success" type="success" class="mt-4">
-              {{ success }} <br />
-              <router-link to="/login">Go to Login</router-link>
-            </v-alert>
+            <div v-if="success" class="mt-4 text-center">
+              <v-icon color="success" size="48" class="mb-2">mdi-check-circle</v-icon>
+              <div class="text-success text-h6 font-weight-medium">{{ success }}</div>
+              <div class="text-caption text-medium-emphasis mt-1">Redirecting to login page...</div>
+            </div>
 
             <v-alert v-if="error" type="error" class="mt-4">
               {{ error }}
@@ -152,6 +151,10 @@ const handleReset = async () => {
       .unwrap()
 
     success.value = 'Password reset successfully!'
+
+    setTimeout(() => {
+      router.push('/login')
+    }, 2000)
   } catch (err: any) {
     error.value = err?.data?.error || 'Invalid or expired token'
   } finally {
