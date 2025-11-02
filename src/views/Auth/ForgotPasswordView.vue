@@ -39,7 +39,6 @@
 
 <script setup lang="ts">
 import { ref } from 'vue'
-import { useRouter } from 'vue-router'
 import { store } from '@/store'
 import { forgotPassword } from '@/store/authApi'
 
@@ -48,7 +47,6 @@ const isLoading = ref(false)
 const success = ref('')
 const error = ref('')
 const emailError = ref('')
-const router = useRouter()
 
 const sendResetLink = async () => {
   emailError.value = email.value ? '' : 'Email is required'

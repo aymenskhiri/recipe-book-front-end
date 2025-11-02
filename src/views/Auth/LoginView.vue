@@ -15,7 +15,6 @@
               required
             />
 
-            <!-- PASSWORD + EYE (EXACT SAME AS RESET) -->
             <v-text-field
               ref="passwordField"
               v-model="password"
@@ -59,6 +58,7 @@ import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { store } from '@/store'
 import { login } from '@/store/authApi'
+import { eventBus } from '@/utils/eventBus'
 
 const email = ref('')
 const password = ref('')
@@ -68,11 +68,11 @@ const showPassword = ref(false)
 
 const emailError = ref('')
 const passwordError = ref('')
- 
+
 const passwordField = ref<any>(null)
 
 const router = useRouter()
- 
+
 const togglePasswordVisibility = () => {
   const input = passwordField.value?.$el.querySelector('input')
   const cursorPosition = input?.selectionStart || 0
@@ -89,21 +89,32 @@ const togglePasswordVisibility = () => {
 }
 
 const handleLogin = async () => {
-  emailError.value = email.value ? '' : 'Email is required'
-  passwordError.value = password.value ? '' : 'Password is required'
+ 
+  emailError.value = ''
+  passwordError.value = ''
+  error.value = ''
+ 
+  if (!email.value) emailError.value = 'Email is required'
+  if (!password.value) passwordError.value = 'Password is required'
   if (!email.value || !password.value) return
 
   isLoading.value = true
-  error.value = ''
 
   try {
     const result = await store
       .dispatch(login.initiate({ email: email.value, password: password.value }))
       .unwrap()
-
+ 
     localStorage.setItem('token', result.token)
+    localStorage.setItem('user', JSON.stringify(result.user))
+
     console.log('Logged in:', result.user)
-    router.push('/')
+ 
+    eventBus.emit('auth-changed')
+ 
+    setTimeout(() => {
+      router.push('/')
+    }, 100)
   } catch (err: any) {
     error.value = err?.data?.error || 'Invalid credentials'
   } finally {
