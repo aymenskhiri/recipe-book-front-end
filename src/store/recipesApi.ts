@@ -55,7 +55,7 @@ export const recipesApi = createApi({
     updateRecipe: builder.mutation<RecipeResponse, { id: number; data: FormData }>({
       query: ({ id, data }) => ({
         url: `/recipes/${id}`,
-        method: 'POST', // Changed to POST
+        method: 'POST',
         body: data,
       }),
       invalidatesTags: ['Recipe'],
