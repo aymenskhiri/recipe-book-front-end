@@ -1,4 +1,3 @@
-// src/store/recipesApi.ts
 import { createApi, fetchBaseQuery } from '@reduxjs/toolkit/query/react'
 
 export interface Recipe {
@@ -10,6 +9,7 @@ export interface Recipe {
   picture: string | null
   user: { id: number; name: string }
   created_at: string
+  is_hidden: boolean
 }
 
 export interface RecipesResponse {
@@ -20,8 +20,9 @@ export interface RecipeResponse {
   data: Recipe
 }
 
-export interface MessageResponse {
+export interface ToggleVisibilityResponse {
   message: string
+  recipe: { id: number; name: string; is_hidden: boolean }
 }
 
 export const recipesApi = createApi({
@@ -36,42 +37,65 @@ export const recipesApi = createApi({
   }),
   tagTypes: ['Recipe'],
   endpoints: (builder) => ({
-    getAllRecipes: builder.query<RecipesResponse, void>({
-      query: () => '/recipes',
-      providesTags: ['Recipe'],
-    }),
     getMyRecipes: builder.query<RecipesResponse, void>({
       query: () => '/my-recipes',
-      providesTags: ['Recipe'],
+      providesTags: (result) =>
+        result
+          ? [
+              ...result.data.map(({ id }) => ({ type: 'Recipe' as const, id })),
+              { type: 'Recipe', id: 'LIST' },
+            ]
+          : [{ type: 'Recipe', id: 'LIST' }],
     }),
+
     getRecipe: builder.query<RecipeResponse, number>({
       query: (id) => `/recipes/${id}`,
-      providesTags: ['Recipe'],
+      providesTags: (result, error, id) => [{ type: 'Recipe', id }],
     }),
+
     createRecipe: builder.mutation<RecipeResponse, FormData>({
       query: (data) => ({ url: '/recipes', method: 'POST', body: data }),
-      invalidatesTags: ['Recipe'],
+      invalidatesTags: [{ type: 'Recipe', id: 'LIST' }],
     }),
+
     updateRecipe: builder.mutation<RecipeResponse, { id: number; data: FormData }>({
       query: ({ id, data }) => ({
         url: `/recipes/${id}`,
         method: 'POST',
         body: data,
       }),
-      invalidatesTags: ['Recipe'],
+      invalidatesTags: (result, error, arg) => [
+        { type: 'Recipe', id: arg.id },
+        { type: 'Recipe', id: 'LIST' },
+      ],
     }),
-    deleteRecipe: builder.mutation<MessageResponse, number>({
+
+    deleteRecipe: builder.mutation<any, number>({
       query: (id) => ({ url: `/recipes/${id}`, method: 'DELETE' }),
-      invalidatesTags: ['Recipe'],
+      invalidatesTags: (result, error, id) => [
+        { type: 'Recipe', id },
+        { type: 'Recipe', id: 'LIST' },
+      ],
+    }),
+
+    toggleRecipeVisibility: builder.mutation<ToggleVisibilityResponse, number>({
+      query: (id) => ({
+        url: `/recipes/${id}/toggle-visibility`,
+        method: 'POST',
+      }),
+      invalidatesTags: (result, error, id) => [
+        { type: 'Recipe', id },
+        { type: 'Recipe', id: 'LIST' },
+      ],
     }),
   }),
 })
 
 export const {
-  useGetAllRecipesQuery,
   useGetMyRecipesQuery,
   useGetRecipeQuery,
   useCreateRecipeMutation,
   useUpdateRecipeMutation,
   useDeleteRecipeMutation,
+  useToggleRecipeVisibilityMutation,
 } = recipesApi

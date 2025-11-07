@@ -101,8 +101,20 @@
                 </div>
               </template>
             </v-img>
+
             <v-chip class="absolute top-2 left-2" color="primary" small label>
               {{ recipe.cuisine_type }}
+            </v-chip>
+
+            <v-chip
+              v-if="recipe.is_hidden"
+              class="absolute top-2 right-2"
+              color="orange darken-3"
+              small
+              label
+            >
+              <v-icon small left>mdi-eye-off</v-icon>
+              Hidden
             </v-chip>
           </div>
 
@@ -127,6 +139,19 @@
               <v-icon left>mdi-pencil</v-icon>
               Edit
             </v-btn>
+
+            <!-- Toggle Visibility Button -->
+            <v-btn
+              :color="recipe.is_hidden ? 'success' : 'warning'"
+              variant="text"
+              @click.stop="toggleVisibility(recipe)"
+              :loading="togglingId === recipe.id"
+              :disabled="togglingId !== null && togglingId !== recipe.id"
+            >
+              <v-icon left>{{ recipe.is_hidden ? 'mdi-eye' : 'mdi-eye-off' }}</v-icon>
+              {{ recipe.is_hidden ? 'Show' : 'Hide' }}
+            </v-btn>
+
             <v-btn color="error" variant="text" @click.stop="confirmDelete(recipe.id)">
               <v-icon left>mdi-delete</v-icon>
               Delete
@@ -160,6 +185,7 @@
       </v-btn>
     </div>
 
+    <!-- Create/Edit Dialog -->
     <v-dialog v-model="dialog" max-width="800" scrollable>
       <v-card>
         <v-card-title>{{ editMode ? 'Edit' : 'Create' }} Recipe</v-card-title>
@@ -258,6 +284,7 @@
       </v-card>
     </v-dialog>
 
+    <!-- Delete Confirmation Dialog -->
     <v-dialog v-model="deleteDialog" max-width="400">
       <v-card>
         <v-card-title class="text-h6">Confirm Delete</v-card-title>
@@ -277,13 +304,14 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { store } from '@/store'
-import { recipesApi, Recipe } from '@/store/recipesApi'
+import { recipesApi, Recipe } from '@/store/recipesApi'  
 
 const recipes = ref<Recipe[]>([])
 const loading = ref(true)
 const error = ref('')
 const saving = ref(false)
 const deleting = ref(false)
+const togglingId = ref<number | null>(null)
 
 const dialog = ref(false)
 const deleteDialog = ref(false)
@@ -315,16 +343,14 @@ const form = ref({
 })
 
 const cuisineTypes = computed(() => {
-  const cuisines = new Set()
+  const cuisines = new Set<string>()
   recipes.value.forEach((recipe) => {
-    if (recipe.cuisine_type) {
-      cuisines.add(recipe.cuisine_type)
-    }
+    if (recipe.cuisine_type) cuisines.add(recipe.cuisine_type)
   })
   return cuisines
 })
 
-const cuisineTypesArray = computed(() => Array.from(cuisineTypes.value) as string[])
+const cuisineTypesArray = computed(() => Array.from(cuisineTypes.value))
 
 const filteredRecipes = computed(() => {
   return recipes.value.filter((recipe) => {
@@ -383,33 +409,22 @@ const editRecipe = (recipe: Recipe) => {
   form.value = {
     name: recipe.name,
     cuisine_type: recipe.cuisine_type,
-    ingredients:
-      recipe.ingredients && recipe.ingredients.length > 0 ? [...recipe.ingredients] : [''],
-    steps: recipe.steps && recipe.steps.length > 0 ? [...recipe.steps] : [''],
+    ingredients: recipe.ingredients?.length ? [...recipe.ingredients] : [''],
+    steps: recipe.steps?.length ? [...recipe.steps] : [''],
     picture: null,
     pictureUrl: recipe.picture || '',
   }
   dialog.value = true
 }
 
-const addIngredient = () => {
-  form.value.ingredients.push('')
-}
-
+const addIngredient = () => form.value.ingredients.push('')
 const removeIngredient = (index: number) => {
-  if (form.value.ingredients.length > 1) {
-    form.value.ingredients.splice(index, 1)
-  }
+  if (form.value.ingredients.length > 1) form.value.ingredients.splice(index, 1)
 }
 
-const addStep = () => {
-  form.value.steps.push('')
-}
-
+const addStep = () => form.value.steps.push('')
 const removeStep = (index: number) => {
-  if (form.value.steps.length > 1) {
-    form.value.steps.splice(index, 1)
-  }
+  if (form.value.steps.length > 1) form.value.steps.splice(index, 1)
 }
 
 const saveRecipe = async () => {
@@ -456,7 +471,6 @@ const saveRecipe = async () => {
     error.value = ''
     await loadRecipes()
   } catch (err: any) {
-    console.error('Save error:', err)
     error.value = err?.data?.message || err?.data?.error || 'Failed to save recipe'
   } finally {
     saving.value = false
@@ -481,6 +495,39 @@ const deleteRecipe = async () => {
   } finally {
     deleting.value = false
     recipeToDelete.value = null
+  }
+}
+
+const toggleVisibility = async (recipe: Recipe) => {
+  if (togglingId.value !== null) return
+  togglingId.value = recipe.id
+
+  try {
+    await store.dispatch(recipesApi.endpoints.toggleRecipeVisibility.initiate(recipe.id)).unwrap()
+ 
+    const recipeIndex = recipes.value.findIndex((r) => r.id === recipe.id)
+    if (recipeIndex !== -1) {
+      const updatedRecipes = [...recipes.value]
+      updatedRecipes[recipeIndex] = {
+        ...updatedRecipes[recipeIndex],
+        is_hidden: !updatedRecipes[recipeIndex].is_hidden,
+      }
+      recipes.value = updatedRecipes
+    }
+  } catch (err: any) {
+    error.value = err?.data?.message || 'Failed to toggle visibility'
+ 
+    const recipeIndex = recipes.value.findIndex((r) => r.id === recipe.id)
+    if (recipeIndex !== -1) {
+      const revertedRecipes = [...recipes.value]
+      revertedRecipes[recipeIndex] = {
+        ...revertedRecipes[recipeIndex],
+        is_hidden: recipe.is_hidden,  
+      }
+      recipes.value = revertedRecipes
+    }
+  } finally {
+    togglingId.value = null
   }
 }
 
